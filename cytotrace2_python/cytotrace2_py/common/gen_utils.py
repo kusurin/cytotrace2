@@ -114,51 +114,46 @@ def build_mapping_dict():
     return mt_dict, mt_dict_alias_and_previous_symbols, mt_mouse_alias_dict, features
 
 
-def load(input_path):
+def load(input_path, sep=','):
     print("cytotrace2: Loading dataset")
-    expression = pd.read_csv(input_path,sep='\t',index_col=0).T # read data
+    expression = pd.read_csv(input_path,sep=sep,index_col=0).T # read data
     # expression = expression.loc[:,~expression.columns.duplicated()].copy() #drop duplicate gene names, to avoid random information loss make sure the genes are unique
-    if expression.columns.duplicated().any():
-        raise ValueError("   Please make sure the gene names are unique.")
-    if expression.index.duplicated().any():
-        raise ValueError("   Please make sure the cell names are unique.")
     return expression
 
 def read_file(file_path):
+    try:
+        file_delim = "," if file_path.lower().endswith(".csv") else "\t"
     
-    if use_dt:
-        try:
-            file_delim = "," if file_path.lower().endswith(".csv") else "\t"
-
+        if use_dt:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=pd.errors.ParserWarning)
-                file_data = dt.fread(file_path, header=True)
+                expression = dt.fread(file_path, header=True)
                 colnames = pd.read_csv(file_path, sep=file_delim, nrows=1, index_col=0).columns
-                rownames = file_data[:, 0].to_pandas().values.flatten()
-                file_data = file_data[:, 1:].to_pandas()
-                file_data.index = rownames
-                file_data.columns = colnames
-                file_data = file_data.astype(float)
-                if file_data.columns.duplicated().any():
-                    raise ValueError("   Please make sure the gene names are unique.")
-                if file_data.index.duplicated().any():
-                    raise ValueError("   Please make sure the cell names are unique.")
+                rownames = expression[:, 0].to_pandas().values.flatten()
+                expression = expression[:, 1:].to_pandas()
+                expression.index = rownames
+                expression.columns = colnames
+                expression = expression.astype(float)
+                expression = expression.transpose()
 
-        except Exception as e:
-            print("Error encountered while reading input: {}".format(file_path))
-            print("Please make sure that you provided the correct path to the input files.",
-                    "The following input file formats are supported:",
-                    ".csv with comma ',' as delimiter,",
-                    "and .txt or .tsv with tab '\\t' as delimiter.")
-            raise
+        else:    
+            expression = load(file_path, sep=file_delim)
+        
+        if expression.columns.duplicated().any():
+            raise ValueError("   Please make sure the gene names are unique.")
+        if expression.index.duplicated().any():
+            raise ValueError("   Please make sure the cell names are unique.")
+        if expression.shape[0] == 0:
+            raise ValueError("   No cells found in the input file.")
+        return expression
 
-        return file_data.transpose()
-    
-    else:
-
-        file_data = load(file_path)
-        return file_data
-
+    except Exception as e:
+        print("Error encountered while reading input: {}".format(file_path))
+        print("Please make sure that you provided the correct path to the input files.",
+                "The following input file formats are supported:",
+                ".csv with comma ',' as delimiter,",
+                "and .txt or .tsv with tab '\\t' as delimiter.")
+        raise
     
 
 
